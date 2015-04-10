@@ -90,7 +90,11 @@ class Client(object):
         except IndexError:
             connection = Connection(self.make_connection())
             connection._states = self._default_states()
-        self._sync(connection)
+        try:
+            self._sync(connection)
+        except:
+            connection.disconnect()
+            raise
         self._in_use_connections.add(connection)
         return connection
 
@@ -103,7 +107,7 @@ class Client(object):
             connection.close()
             connection.state = Connection.CLOSED
             self._created_connections -= 1
-        elif connection.state == Connection.BROKEN
+        elif connection.state == Connection.BROKEN:
             connection.close()
             connection.state = Connection.CLOSED
             self._created_connections -= 1
@@ -265,7 +269,7 @@ class Client(object):
                                 connection = self_name
                             if connection is not None and hasattr(connection, "reconnect"):
                                 self.ex(connection.reconnect)
-                                connection._wrapper._states = self._default_status()
+                                connection._wrapper._states = self._default_states()
                             __xrange = xrange(_xrange)
                         return self.ex(fn, *args, **kwargs)
                     except SocketError, e:
@@ -293,7 +297,7 @@ class Client(object):
                     self._setter[st](wrapped_connection, *s._args, **s._kwargs)
                 for s in minus:
                     self._unsetter[st](wrapped_connection, *s._args, **s._kwargs)
-                conn._states[st] += plus
+                conn._states[st] |= plus
                 conn._states[st] -= minus
             else:
                 self._setter[st](wrapped_connection, *state._args, **state._kwargs)
