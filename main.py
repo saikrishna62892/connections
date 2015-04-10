@@ -3,7 +3,7 @@ from connections import Client, SocketError as ClientSocketError, WrappedConnect
 from beanstalkc import Connection as BeanstalkConnection, SocketError as BeanstalkSocketError
 
 def BeanstalkClient(host = "127.0.0.1", port = 11300,
-        max_connections=5, max_idle_connections=0):
+            max_connections=5, max_idle_connections=0):
     client = Client(max_connections=max_connections,
             max_idle_connections=max_idle_connections)
     class Connection(BeanstalkConnection, WrappedConnection):
@@ -28,6 +28,9 @@ def BeanstalkClient(host = "127.0.0.1", port = 11300,
         def ignore(self, name):
             return super(Connection, self).ignore(name)
 
+        def disconnect(self):
+            return super(Connection, self).close()
+
         @staticmethod
         @client.default_states()
         def default_states():
@@ -51,7 +54,6 @@ def BeanstalkClient(host = "127.0.0.1", port = 11300,
 
     return client
 
-
 def main():
     client = BeanstalkClient()
     with client.connecting() as connection:
@@ -60,6 +62,8 @@ def main():
     with client.connecting() as connection:
         connection.put("tsanyen")
         print connection.using()
+
+    client.close()
 
 if __name__ == "__main__":
     main()

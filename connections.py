@@ -44,6 +44,10 @@ class Connection(object):
             self._states = conn.default_states()
         raise NotImplementedError
 
+    def disconnect(self):
+        if hasattr(self._connection, "disconnect"):
+            self._connection.disconnect()
+
 class WrappedConnection(object):
     def wrapper(self, conn):
         self._wrapper = conn
@@ -61,6 +65,12 @@ class Client(object):
         self.max_idle_connections = max_idle_connections
         self._wrapper = None
         self.reset()
+
+    def __enter__():
+        return self
+
+    def __exit__():
+        self.close()
 
     def get_connection(self):
         self._checkpid()
@@ -83,6 +93,12 @@ class Client(object):
             self._created_connections -= 1
         else:
             self._available_connections.append(connection)
+
+    def close(self):
+        for x in self._available_connections:
+            x.disconnect()
+        for x in self._in_use_connections:
+            x.disconnect()
 
     def reset(self):
         self.pid = os.getpid()
