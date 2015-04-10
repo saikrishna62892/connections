@@ -1,4 +1,3 @@
-import time
 from connections import Client, SocketError as ClientSocketError, WrappedConnection, State as ClientState
 from beanstalkc import Connection as BeanstalkConnection, SocketError as BeanstalkSocketError
 
