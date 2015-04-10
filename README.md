@@ -3,7 +3,7 @@
 ### sample for beanstalkc
 
 ####
-    from connections import Client, SocketError as ClientSocketError, WrappedConnection, State as ClientState
+    from connections import Client, SocketError as ClientSocketError, WrappedConnection, State as ClientState, StateSet
     from beanstalkc import Connection as BeanstalkConnection, SocketError as BeanstalkSocketError
 
     def BeanstalkClient(host = "127.0.0.1", port = 11300,
@@ -40,7 +40,7 @@
             def default_states():
                 return {
                            "using": ClientState("default"),
-                           "watching":set([
+                           "watching":StateSet([
                                ClientState("default")
                                ])
                        }

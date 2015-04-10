@@ -4,6 +4,7 @@ import gevent
 import time
 import functools
 
+
 class ConnectionError(Exception): pass
 class SocketError(Exception): pass
 
@@ -27,11 +28,19 @@ class NotImplementedConnection(object):
         raise NotImplementedError
 
 class Connection(object):
+    CONNECTING = 0
+    CONNECTED = 1
+    IN_USE = 2
+    BROKEN = 3
+    CLOSED = 4
+    RECONNECTING = 5
+
     def __init__(self, conn):
         self._connection = conn
         self.pid = os.getpid()
         conn.wrapper(self)
         self._states = None
+        self.state = self.CONNECTED
 
     def __getattr__(self, name):
         if hasattr(self._connection, name):
@@ -40,8 +49,10 @@ class Connection(object):
 
     def reconnect(self):
         if hasattr(self._connection, "reconnect"):
+            self.state = self.RECONNECTING
             self._connection.reconnect()
             self._states = conn.default_states()
+            self.state = self.CONNECTED
         raise NotImplementedError
 
     def disconnect(self):
@@ -90,9 +101,15 @@ class Client(object):
         self._in_use_connections.remove(connection)
         if len(self._available_connections) >= self.max_idle_connections:
             connection.close()
+            connection.state = Connection.CLOSED
+            self._created_connections -= 1
+        elif connection.state == Connection.BROKEN
+            connection.close()
+            connection.state = Connection.CLOSED
             self._created_connections -= 1
         else:
             self._available_connections.append(connection)
+            connection.state = Connection.CONNECTED
 
     def close(self):
         for x in self._available_connections:
@@ -305,11 +322,12 @@ class Context(object):
             self._connection = get_connection()
         else:
             self._connection = self._connections.get_connection()
+        self._connection.state = Connection.IN_USE
         return self._connection
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         if exc_tb is not None:
-            self._connection.state = BROKEN
+            self._connection.state = Connection.BROKEN
         self._connections.release(self._connection)
         if exc_tb is not None:
             return False
