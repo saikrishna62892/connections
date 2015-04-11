@@ -1,8 +1,7 @@
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 import threading
 import os
-import gevent
 import time
 import functools
 
@@ -75,7 +74,7 @@ class Client(object):
 
         self.max_connections = max_connections
         self.max_idle_connections = max_idle_connections
-        self._wrapper = None
+        self._catch = None
         self.reset()
 
     def __enter__():
@@ -214,16 +213,22 @@ class Client(object):
             return __fn
         return _fn
 
-    def wrapper(self, **kwargs):
+    def catcher(self, **kwargs):
         def _fn(fn):
-            self._wrapper = fn
+            self._catch = fn
+            return self.__not_callable(fn)
+        return _fn
+
+    def delayer(self, **kwargs):
+        def _fn(fn):
+            self._delay = fn
             return self.__not_callable(fn)
         return _fn
 
     def ex(self, fn, *args, **kwargs):
-        if self._wrapper is None:
+        if self._catch is None:
             return fn(*args, **kwargs)
-        return self._wrapper(fn, *args, **kwargs)
+        return self._catch(fn, *args, **kwargs)
 
     def retry(self, **kwargs):
         max_retry = kwargs.pop("retry", 0)
@@ -274,8 +279,8 @@ class Client(object):
                             __xrange = xrange(_xrange)
                         return self.ex(fn, *args, **kwargs)
                     except SocketError, e:
-                        if trying > 0:
-                            gevent.sleep(1<<min(2, trying - 1)) # max sleep 4 seconds
+                        if self._delay is not None and trying > 0 :
+                            self._delay(trying)
                         if max_retry > 0 and trying >= max_retry:
                             raise e
 

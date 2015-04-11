@@ -1,15 +1,12 @@
 from connections import Client, SocketError as ClientSocketError, WrappedConnection, State as ClientState, StateSet
 from beanstalkc import Connection as BeanstalkConnection, SocketError as BeanstalkSocketError
+import gevent
 
 def BeanstalkClient(host = "127.0.0.1", port = 11300,
             max_connections=5, max_idle_connections=0):
     client = Client(max_connections=max_connections,
             max_idle_connections=max_idle_connections)
     class Connection(BeanstalkConnection, WrappedConnection):
-
-        @client.retry(retry=3)
-        def put(self, *args, **kwargs):
-            return super(Connection, self).put(*args, **kwargs)
 
         @client.retry()
         def reserve(self):
@@ -30,9 +27,8 @@ def BeanstalkClient(host = "127.0.0.1", port = 11300,
         def disconnect(self):
             return super(Connection, self).close()
 
-        @staticmethod
         @client.default_states()
-        def default_states():
+        def __default_states():
             return {
                        "using": ClientState("default"),
                        "watching":StateSet([
@@ -40,16 +36,20 @@ def BeanstalkClient(host = "127.0.0.1", port = 11300,
                            ])
                    }
 
-    @client.connecter()
-    def connect():
-        return Connection(host=host, port=port)
+        @client.connecter()
+        def __connecter():
+            return Connection(host=host, port=port)
 
-    @client.wrapper()
-    def wrap(fn, *args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except BeanstalkSocketError, e:
-            raise ClientSocketError(e)
+        @client.catcher()
+        def __catch(fn, *args, **kwargs):
+            try:
+                return fn(*args, **kwargs)
+            except BeanstalkSocketError, e:
+                raise ClientSocketError(e)
+
+        @client.delayer()
+        def __delay(trying):
+            gevent.sleep(1<<min(2, trying - 1)) # max sleep 4 seconds
 
     return client
 
@@ -57,10 +57,19 @@ def main():
     client = BeanstalkClient()
     with client.connecting() as connection:
         connection.use("tsanyen")
+        connection.watch("tsanyen")
 
     with client.connecting() as connection:
-        connection.put("tsanyen")
+        connection.put("data")
+        retry_put = client.retry(retry=3)(connection.put)
+        retry_put("data")
         print connection.using()
+
+    with client.connecting() as connection:
+        for x in xrange(2):
+            job = connection.reserve()
+            print job.body
+            job.delete()
 
     client.close()
 

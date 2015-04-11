@@ -6,10 +6,6 @@ from connections import __version__ as src_version
 PKG_VERSION = os.environ.get('CONNECTIONS_PKG_VERSION', src_version)
 
 install_requires = []
-with open("requirements.txt") as fi:
-    for line in fi:
-        install_requires.append(line)
-
 
 setup(
     name='connections',
@@ -33,6 +29,6 @@ connections is a Universal Connection Pool with retry and states keep
         'Operating System :: OS Independent',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
-    install_requires=install_requires
+    install_requires=install_requires,
 )
 
