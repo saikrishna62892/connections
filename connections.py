@@ -1,9 +1,10 @@
+__version__ = "0.1.0"
+
 import threading
 import os
 import gevent
 import time
 import functools
-
 
 class ConnectionError(Exception): pass
 class SocketError(Exception): pass
