@@ -1,4 +1,4 @@
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 import threading
 import os
@@ -151,20 +151,20 @@ class Client(object):
     def connect(self):
         return Context(self)
 
-    def connecting(self, retry=0):
-        return Context(self, waiting=True, retry=retry)
+    def connecting(self, retry=0, catch=None):
+        return Context(self, waiting=True, retry=retry, catch=catch)
 
     def connecter(self, **kwargs):
         def _fn(fn):
             self._connecter = fn
-            return self.__not_callable(fn)
+            return fn
         return _fn
 
     def default_states(self, **kwargs):
         def _fn(fn):
             self._default_states = fn
             self._states = fn()
-            return self.__not_callable(fn)
+            return fn
         return _fn
 
 
@@ -216,13 +216,13 @@ class Client(object):
     def catcher(self, **kwargs):
         def _fn(fn):
             self._catch = fn
-            return self.__not_callable(fn)
+            return fn
         return _fn
 
     def delayer(self, **kwargs):
         def _fn(fn):
             self._delay = fn
-            return self.__not_callable(fn)
+            return fn
         return _fn
 
     def ex(self, fn, *args, **kwargs):
@@ -232,6 +232,8 @@ class Client(object):
 
     def retry(self, **kwargs):
         max_retry = kwargs.pop("retry", 0)
+        delayer = kwargs.pop("delayer", None)
+        catcher = kwargs.pop("catch", None)
         if not isinstance(max_retry, (int, long)) or max_retry < 0:
             raise ValueError('"retry" must be a positive integer')
         origin_name = kwargs.pop("self", None)
@@ -279,7 +281,11 @@ class Client(object):
                             __xrange = xrange(_xrange)
                         return self.ex(fn, *args, **kwargs)
                     except SocketError, e:
-                        if self._delay is not None and trying > 0 :
+                        if catcher is not None and catcher(e) == False:
+                            raise e
+                        if delayer is not None:
+                            delayer(trying)
+                        elif self._delay is not None and trying > 0 :
                             self._delay(trying)
                         if max_retry > 0 and trying >= max_retry:
                             raise e
@@ -310,7 +316,7 @@ class Client(object):
                 conn._states[st] = state
 
     @staticmethod
-    def __not_callable(fn):
+    def notcallable(fn):
         @functools.wraps(fn)
         def _fn(*args, **kwargs):
             msg = str(fn) + " can't be called any more"
@@ -318,15 +324,16 @@ class Client(object):
         return _fn
 
 class Context(object):
-    def __init__(self, connections, waiting=False, retry=0):
+    def __init__(self, connections, waiting=False, retry=0, catch=None):
         self._connections = connections
         self._connection = None
         self._waiting = waiting
         self._retry = retry
+        self._catch = catch
 
     def __enter__(self):
         if self._waiting:
-            @self._connections.retry(retry=self._retry)
+            @self._connections.retry(retry=self._retry, catch=self._catch)
             def get_connection():
                 return self._connections.get_connection()
             self._connection = get_connection()

@@ -40,28 +40,41 @@ def BeanstalkClient(host = "127.0.0.1", port = 11300,
         def __connecter():
             return Connection(host=host, port=port)
 
+        @client.notcallable
         @client.catcher()
         def __catch(fn, *args, **kwargs):
             try:
                 return fn(*args, **kwargs)
             except BeanstalkSocketError, e:
+                print "catcher:", e # catch all socket err
                 raise ClientSocketError(e)
 
+        @client.notcallable
         @client.delayer()
         def __delay(trying):
-            gevent.sleep(1<<min(2, trying - 1)) # max sleep 4 seconds
+            if trying > 0:
+                gevent.sleep(1<<min(2, trying - 1)) # max sleep 4 seconds
 
     return client
 
 def main():
     client = BeanstalkClient()
-    with client.connecting() as connection:
+
+    def catch_connecting_retry(e):
+        print e
+
+    with client.connecting(catch=catch_connecting_retry) as connection:
         connection.use("tsanyen")
         connection.watch("tsanyen")
 
     with client.connecting() as connection:
         connection.put("data")
-        retry_put = client.retry(retry=3)(connection.put)
+        def catch_put_retry(e):
+            if isinstance(e, ClientSocketError):
+                print e
+                return True
+
+        retry_put = client.retry(retry=3, catch=catch_put_retry)(connection.put)
         retry_put("data")
         print connection.using()
 
