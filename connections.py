@@ -280,7 +280,7 @@ class Client(object):
                                 connection._wrapper._states = self._default_states()
                             __xrange = xrange(_xrange)
                         return self.ex(fn, *args, **kwargs)
-                    except SocketError, e:
+                    except SocketError| e:
                         if catcher is not None and catcher(e) == False:
                             raise e
                         if delayer is not None:
